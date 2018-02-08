@@ -1,0 +1,6 @@
+# Application-level permissions
+
+[]
+access = read : [ admin ], write : [ admin ]
+export = system
+version = 6.5.1

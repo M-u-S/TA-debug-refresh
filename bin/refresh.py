@@ -8,6 +8,7 @@ myDebug = 'no'
 # Changelog
 # 18 December 2016 - tested on Splunk 6.5.1
 # 19 December 2016 - added logging to splunkd.log / sorting of the result
+# 26 February 2018 - minor code fix as requested by Splunk
 
 # import some Python moduls
 import splunk
@@ -50,8 +51,7 @@ if myDebug == 'yes':
 results, dummyresults, settings = splunk.Intersplunk.getOrganizedResults()
 results = []  # we don't care about incoming results
 if myDebug == 'yes': logger.debug('setting: %s ' % settings)
-sessionKey = settings.get('sessionKey', None)  # getting session key
-if myDebug == 'yes': logger.debug('using sessionKey: %s ' % sessionKey)
+sessionKey = settings.get('sessionKey', None)  # getting session key but will not log!
 owner = settings.get('owner', None)  # getting user / owner
 if myDebug == 'yes': logger.debug('using owner: %s ' % owner)
 namespace = settings.get('namespace', None)  # getting namespace

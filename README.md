@@ -21,5 +21,8 @@ This is an open source project, no support provided, but you can ask questions
 on answers.splunk.com and I will most likely answer it.
 Github repository: https://github.com/M-u-S/TA-debug-refresh
 
+Running Splunk on Windows? Good Luck, not my problem.
+
+
 ## Version ##
 `18. August 2018 : 2.3.0 - added entity option`

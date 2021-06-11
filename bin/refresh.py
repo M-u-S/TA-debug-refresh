@@ -87,6 +87,10 @@ if myEntity == 'safe' or myEntity == 'all':  # reload all entities
     logger.info('reloading all entities ...')
     # get rest response and content
     response, content = rest.simpleRequest('/servicesNS/-/-/admin', sessionKey=sessionKey, method='GET')
+    
+    if sys.version_info[0] >= 3: 
+        content = content.decode()
+
     for line in content.split('\n'):  # loop throught the content
         logger.info('line: %s ' % line)
         if '_reload' in line:  # _reload link found

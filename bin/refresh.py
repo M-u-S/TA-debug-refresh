@@ -80,6 +80,11 @@ logger.info('using namespace: %s ' % namespace)
 # setting up empty output list
 myList = []
 
+# # debugcode
+# import sys, os
+# sys.path.append(os.path.join(os.environ['SPLUNK_HOME'],'etc','apps','SA-VSCode','bin'))
+# import splunk_debug as dbg
+# dbg.enable_debugging(timeout=25)
 
 # getting all the _reload links form the response content
 reloadLinks = []  # set empty list
@@ -125,7 +130,8 @@ else:  # reload all entities
     myREST = '/servicesNS/-/-/admin/%s' % myEntity
     logger.info('getting reload link from : %s' % myREST)
     response, content = rest.simpleRequest(myREST, sessionKey=sessionKey, method='GET')
-    for line in content.split('\n'):  # loop throught the content
+    contentnew = content.decode()
+    for line in contentnew.split('\n'):  # loop throught the content
         logger.info('line: %s ' % line)
         if '_reload' in line:  # _reload link found
             reloadLink = re.findall(r'href\=\"(.+?)\"', line)  # getting the links

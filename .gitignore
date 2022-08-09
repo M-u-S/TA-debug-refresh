@@ -1,0 +1,9 @@
+.vscode/*
+**/.DS_Store
+*.pyc
+*.tgz
+reports
+cloud_backup/.vscode/
+cloud_backup/local/
+cloud_backup/metadata/
+backupconfig.json

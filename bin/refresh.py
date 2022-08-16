@@ -2,16 +2,15 @@
 # Copyright (C) 2014 MuS
 # http://answers.splunk.com/users/2122/mus
 
-# enable / disable logger debug output
-myDebug = 'no'
-
 # Changelog
 # 18 December 2016 - tested on Splunk 6.5.1
 # 19 December 2016 - added logging to splunkd.log / sorting of the result
 # 26 February 2018 - minor code fix as requested by Splunk
 # 18 August 2018 - exclude inputs from default run, added option to specifiy entities to be reloaded
+# 12 February 2022 - Python 3
 
 # import some Python moduls
+from __future__ import print_function
 import splunk
 import sys
 import os
@@ -22,6 +21,8 @@ import collections
 import splunk.rest as rest
 from optparse import OptionParser
 
+# enable / disable logger debug output
+myDebug = 'no'
 
 # get SPLUNK_HOME form OS
 SPLUNK_HOME = os.environ['SPLUNK_HOME']
@@ -66,7 +67,6 @@ logger.debug('got these options: %s ...' % (options))  # logger
 myEntity = options.get('entity', 'safe')
 logger.debug('got this entity: %s ...' % (myEntity))  # logger
 
-
 # getting the sessionKey, owner, namespace
 results, dummyresults, settings = splunk.Intersplunk.getOrganizedResults()
 results = []  # we don't care about incoming results
@@ -80,13 +80,16 @@ logger.info('using namespace: %s ' % namespace)
 # setting up empty output list
 myList = []
 
-
 # getting all the _reload links form the response content
 reloadLinks = []  # set empty list
 if myEntity == 'safe' or myEntity == 'all':  # reload all entities
     logger.info('reloading all entities ...')
     # get rest response and content
     response, content = rest.simpleRequest('/servicesNS/-/-/admin', sessionKey=sessionKey, method='GET')
+    # python3 specific
+    if sys.version_info[0] >= 3:
+        content = content.decode()
+
     for line in content.split('\n'):  # loop throught the content
         logger.info('line: %s ' % line)
         if '_reload' in line:  # _reload link found
@@ -115,12 +118,14 @@ if myEntity == 'safe' or myEntity == 'all':  # reload all entities
                 logger.info('appending final links ...')
                 reloadLinks.append(name)  # appending relaod link to list
 
-else:  # reload all entities
-    logger.info('reloading one entities ...')
+if myEntity == 'list':  # list all entities
+    logger.info('list all entities ...')
     # get rest response and content
-    myREST = '/servicesNS/-/-/admin/%s' % myEntity
-    logger.info('getting reload link from : %s' % myREST)
-    response, content = rest.simpleRequest(myREST, sessionKey=sessionKey, method='GET')
+    response, content = rest.simpleRequest('/servicesNS/-/-/admin', sessionKey=sessionKey, method='GET')
+    # python3 specific
+    if sys.version_info[0] >= 3:
+        content = content.decode()
+
     for line in content.split('\n'):  # loop throught the content
         logger.info('line: %s ' % line)
         if '_reload' in line:  # _reload link found
@@ -130,8 +135,69 @@ else:  # reload all entities
                 logger.info('line did not match ...')
             for name in reloadLink:  # add only capable endpoints / take from debug.py
                 logger.info('name: %s' % name)
+                logger.info('checking auth-service: ...')
+                if 'auth-services' in name:  # refreshing auth causes logout, no reload here!
+                    logger.info('found auth-service: stepping forward ...')
+                    continue # skip it to be safe
+                logger.info('checking cooked: ...')
+                if 'cooked' in name:  # refreshing cooked causes splunktcp reset, only when all is requested!
+                    if 'all' in myEntity:
+                        logger.info('appending final links ...')
+                        reloadLinks.append(name)  # appending relaod link to list
+                    logger.info('found cooked: stepping forward ...')
+                    continue # otherwise skip it to be safe
+                logger.info('checking windows: ...')
+                if sys.platform == 'win32' and name == 'fifo':
+                    # splunkd never loads FIFO on windows, but advertises it anyway
+                    logger.info('found windows stuff: stepping forward ...')
+                    continue
                 logger.info('appending final links ...')
                 reloadLinks.append(name)  # appending relaod link to list
+
+    # listing the endpoints now
+    logger.info('listing the endpoints now ...')
+    for target in reloadLinks:  # looping through the reload links
+        endpointresult = {}  # set empty result dict
+        logger.info('listing the %s endpoints now ...' % target)
+        target2 = re.findall(r'\/\w+\/-\/-\/\w+\/([^\/]+)\/_reload', target)  # getting the links
+        endpointresult['entity'] = target2  # set result endpoint
+        endpointresult['REST'] = target  # set result endpoint
+        logger.info('endpointresult: %s' % endpointresult)
+        od = collections.OrderedDict(sorted(endpointresult.items()))  # sort the list
+        myList.append(od)  # append the ordered results to the list
+    logger.info('done with the work ...')
+    logger.info('this is myList: %s' % myList)
+    logger.info('output the result to splunk> ...')
+    splunk.Intersplunk.outputResults(myList)  # output the result to splunk
+    exit()
+
+lis = ['list','safe','all']
+if myEntity not in lis:  # reload one entity
+    logger.info('reloading one entity ...')
+    # get rest response and content
+    reloadLink = '/servicesNS/-/-/admin/%s/_reload' % myEntity
+    logger.info('checking if the entity exists ...')
+    # check if entity exists
+    try:
+        response, content = rest.simpleRequest(reloadLink, sessionKey=sessionKey, method='GET')
+        logger.info('request made ...')
+        # for python 3
+        if sys.version_info[0] >= 3:
+            content = content.decode()
+        reloadLinks.append(reloadLink)  # appending reload link to list
+        logger.info('reloadLinks: %s ' % reloadLinks)
+    # entity does not exists
+    except:
+        endpointresult = {}  # set empty result dict
+        logger.info('entity does not exists ...')
+        endpointresult['entity'] = 'Does not exists'  # set result endpoint
+        od = collections.OrderedDict(sorted(endpointresult.items()))  # sort the list
+        myList.append(od)  # append the ordered results to the list
+        logger.info('done with the work ...')
+        logger.info('this is myList: %s' % myList)
+        logger.info('output the result to splunk> ...')
+        splunk.Intersplunk.outputResults(myList)  # output the result to splunk
+        exit()
 
 logger.info('final reloadLinks: %s' % reloadLinks)
 
@@ -140,9 +206,12 @@ logger.info('reloading the endpoints now ...')
 for target in reloadLinks:  # looping through the reload links
     endpointresult = {}  # set empty result dict
     logger.info('reloading the %s endpoints now ...' % target)
+    target2 = re.findall(r'\/\w+\/-\/-\/\w+\/([^\/]+)\/_reload', target)  # getting the links
     # get rest response and content
     response, content = rest.simpleRequest(target, sessionKey=sessionKey, method='POST')
-    endpointresult['endpoint'] = target  # set result endpoint
+    #endpointresult['entity'] = target  # set result endpoint
+    endpointresult['entity'] = target2  # set result endpoint
+    endpointresult['REST'] = target  # set result endpoint
     endpointresult['status'] = response['status']  # set endpoint reload status
     logger.info('endpointresult: %s' % endpointresult)
     od = collections.OrderedDict(sorted(endpointresult.items()))  # sort the list
